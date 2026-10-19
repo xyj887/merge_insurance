@@ -1,0 +1,21 @@
+# ⚠️ 投保数据含身份证号等敏感个人信息，禁止提交任何数据文件
+*.xlsx
+*.xls
+*.csv
+data/
+原始数据/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# PyInstaller 打包产物
+build/
+dist/
+*.spec
+
+# 系统文件
+.DS_Store
+Thumbs.db

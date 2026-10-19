@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+    color: #1a1a2e; min-height: 100vh; padding: 32px 24px;
+  }
+  .container { max-width: 820px; margin: 0 auto; }
+
+  .header { margin-bottom: 24px; }
+  .header h1 { font-size: 24px; font-weight: 600; color: #16213e; letter-spacing: .5px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+    background: #e7f5ef; color: #0a7f52; padding: 6px 12px;
+    border-radius: 20px; font-size: 13px; font-weight: 500;
+  }
+  .badge::before { content: "🔒"; font-size: 12px; }
+
+  .card {
+    background: #fff; border-radius: 14px; padding: 28px;
+    box-shadow: 0 4px 20px rgba(22, 33, 62, .08); margin-bottom: 20px;
+  }
+
+  /* 拖拽上传区 */
+  .dropzone {
+    border: 2px dashed #c3cee0; border-radius: 12px; padding: 48px 20px;
+    text-align: center; cursor: pointer; transition: all .22s ease; background: #fafbfd;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: #3b6fd4; background: #f0f5ff; transform: translateY(-2px);
+  }
+  .dropzone .icon { font-size: 42px; margin-bottom: 14px; }
+  .dropzone .main { font-size: 15px; color: #34405e; font-weight: 500; }
+  .dropzone .sub { font-size: 13px; color: #8592a8; margin-top: 8px; }
+
+  /* 选中的文件条 */
+  .file-info {
+    display: none; align-items: center; gap: 12px; margin-top: 18px;
+    background: #f0f5ff; border: 1px solid #d6e3fb; border-radius: 10px; padding: 14px 16px;
+  }
+  .file-info.show { display: flex; }
+  .file-info .name {
+    flex: 1; font-size: 14px; color: #16213e; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .file-info .size { font-size: 12px; color: #6b7891; white-space: nowrap; }
+  .file-info .clear {
+    background: none; border: none; color: #98a3b8; cursor: pointer;
+    font-size: 18px; line-height: 1; padding: 0 4px;
+  }
+  .file-info .clear:hover { color: #d63b3b; }
+
+  /* 按钮 */
+  .btn {
+    width: 100%; margin-top: 20px; padding: 14px; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 600; cursor: pointer; transition: all .2s ease;
+    font-family: inherit; letter-spacing: 1px;
+  }
+  .btn-primary { background: #3b6fd4; color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #2f5cb8; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(59,111,212,.35); }
+  .btn-primary:disabled { background: #c3cee0; cursor: not-allowed; }
+  .btn-success { background: #0a7f52; color: #fff; }
+  .btn-success:hover { background: #096945; transform: translateY(-1px); }
+
+  /* 状态 */
+  .status { margin-top: 18px; padding: 14px 16px; border-radius: 10px; font-size: 14px; display: none; }
+  .status.show { display: block; }
+  .status.processing { background: #fff8e6; color: #8a6100; border: 1px solid #ffe9b0; }
+  .status.error { background: #fdecec; color: #c02626; border: 1px solid #f8c9c9; }
+  .status.success { background: #e7f5ef; color: #0a7f52; border: 1px solid #b8e3cf; }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; margin-right: 8px;
+    border: 2px solid #ffe9b0; border-top-color: #8a6100; border-radius: 50%;
+    animation: spin .7s linear infinite; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 结果 */
+  .result { display: none; }
+  .result.show { display: block; }
+  .stats { display: flex; gap: 14px; margin: 18px 0; }
+  .stat {
+    flex: 1; background: #f7f9fc; border-radius: 10px; padding: 16px; text-align: center;
+    border: 1px solid #e8eef7;
+  }
+  .stat .num { font-size: 22px; font-weight: 700; color: #3b6fd4; }
+  .stat .label { font-size: 12px; color: #6b7891; margin-top: 4px; }
+
+  /* 日志 */
+  .logs {
+    margin-top: 16px; background: #f7f9fc; border: 1px solid #e8eef7;
+    border-radius: 10px; padding: 14px; font-size: 12px; color: #55627a;
+    font-family: Consolas, Menlo, monospace; max-height: 160px; overflow-y: auto;
+    line-height: 1.7; display: none;
+  }
+  .logs.show { display: block; }
+
+  .footer { text-align: center; font-size: 12px; color: #98a3b8; margin-top: 24px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>{{ title }}</h1>
+    <div class="badge">数据全程在本机处理，不会上传到任何服务器</div>
+  </div>
+
+  <div class="card">
+    <div class="dropzone" id="dropzone">
+      <div class="icon">📄</div>
+      <div class="main">点击选择文件，或将 Excel 拖到这里</div>
+      <div class="sub">支持 .xlsx / .xls，单个文件不超过 {{ max_mb }}MB</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+
+    <div class="file-info" id="fileInfo">
+      <span>✅</span>
+      <span class="name" id="fileName"></span>
+      <span class="size" id="fileSize"></span>
+      <button class="clear" id="clearBtn" title="移除">×</button>
+    </div>
+
+    <button class="btn btn-primary" id="runBtn" disabled>开始处理</button>
+
+    <div class="status" id="status"></div>
+
+    <div class="result" id="result">
+      <div class="stats">
+        <div class="stat"><div class="num" id="statRows">0</div><div class="label">汇总记录数</div></div>
+        <div class="stat"><div class="num" id="statDays">0</div><div class="label">保障天数合计</div></div>
+      </div>
+      <button class="btn btn-success" id="downloadBtn">下载汇总文件</button>
+    </div>
+
+    <div class="logs" id="logs"></div>
+  </div>
+
+  <div class="footer">
+    汇总前自动识别三种文件格式的列名 · 输出结果位于下载目录
+  </div>
+</div>
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileInfo = document.getElementById('fileInfo');
+  const fileName = document.getElementById('fileName');
+  const fileSize = document.getElementById('fileSize');
+  const clearBtn = document.getElementById('clearBtn');
+  const runBtn = document.getElementById('runBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const logs = document.getElementById('logs');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let selectedFile = null;
+  let downloadUrl = null;
+
+  // 选文件
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) pickFile(e.target.files[0]); });
+
+  // 拖拽
+  ['dragenter', 'dragover'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('dragover'); }));
+  ['dragleave', 'drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('dragover'); }));
+  dropzone.addEventListener('drop', e => { if (e.dataTransfer.files[0]) pickFile(e.dataTransfer.files[0]); });
+
+  clearBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    resetAll();
+  });
+
+  function pickFile(file) {
+    const ok = /\.(xlsx|xls)$/i.test(file.name);
+    if (!ok) { showStatus('error', '请上传 .xlsx 或 .xls 格式的文件'); return; }
+    selectedFile = file;
+    fileName.textContent = file.name;
+    fileSize.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+    fileInfo.classList.add('show');
+    runBtn.disabled = false;
+    hide(result); hide(status); hide(logs);
+    logs.textContent = '';
+  }
+
+  function resetAll() {
+    selectedFile = null; fileInput.value = ''; downloadUrl = null;
+    fileInfo.classList.remove('show');
+    runBtn.disabled = true;
+    hide(result); hide(status); hide(logs);
+    logs.textContent = '';
+  }
+
+  // 处理
+  runBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    runBtn.disabled = true;
+    hide(result);
+    showStatus('processing', '<span class="spinner"></span>正在处理，数据量大时请耐心等待...');
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+      const resp = await fetch('/api/process', { method: 'POST', body: fd });
+      const data = await resp.json();
+
+      if (!data.ok) {
+        showStatus('error', '处理失败：' + (data.error || '未知错误'));
+        runBtn.disabled = false;
+        return;
+      }
+
+      // 日志
+      if (data.logs && data.logs.length) {
+        logs.textContent = data.logs.join('\n');
+        show(logs);
+      }
+
+      document.getElementById('statRows').textContent = data.rows.toLocaleString();
+      document.getElementById('statDays').textContent = data.days.toLocaleString();
+      downloadUrl = data.download_url;
+      showStatus('success', '处理完成！请点击下方按钮下载汇总文件');
+      show(result);
+      runBtn.disabled = false;
+    } catch (err) {
+      showStatus('error', '请求失败：' + err.message);
+      runBtn.disabled = false;
+    }
+  });
+
+  // 下载
+  downloadBtn.addEventListener('click', () => {
+    if (downloadUrl) window.location.href = downloadUrl;
+  });
+
+  function show(el) { el.classList.add('show'); }
+  function hide(el) { el.classList.remove('show'); }
+  function showStatus(type, msg) {
+    status.className = 'status show ' + type;
+    status.innerHTML = msg;
+  }
+</script>
+</body>
+</html>

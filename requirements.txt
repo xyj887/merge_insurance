@@ -1,0 +1,9 @@
+# 桌面版（本地Web服务）依赖
+# 注意：建议在 Windows 上用 Python 3.11 或 3.12，PyInstaller 兼容性最稳
+pandas>=2.0
+openpyxl>=3.0
+flask>=3.0
+pywebview>=5.0
+
+# 打包工具（仅打包机需要，使用者电脑不需要）
+pyinstaller>=6.3

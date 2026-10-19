@@ -1,0 +1,70 @@
+name: 打包 Windows 版本
+
+on:
+  # 方式1：打 tag 触发（v1.0 这种），并自动发布 Release
+  push:
+    tags:
+      - "v*"
+  # 方式2：在 GitHub 网页上手动点"Run workflow"触发
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: PyInstaller 打包
+        run: |
+          python -m PyInstaller --noconfirm --onedir --windowed --clean `
+            --name "投保数据汇总工具" `
+            --add-data "templates;templates" `
+            --collect-all webview `
+            --exclude-module matplotlib `
+            --exclude-module scipy `
+            --exclude-module PyQt5 `
+            --exclude-module IPython `
+            --exclude-module notebook `
+            --exclude-module pytest `
+            insurance_web.py
+
+      - name: 压缩为 ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist\投保数据汇总工具\*" -DestinationPath "投保数据汇总工具-windows.zip"
+          Get-Item "投保数据汇总工具-windows.zip" | Select-Object Name, @{n='大小MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 投保数据汇总工具-windows
+          path: 投保数据汇总工具-windows.zip
+          retention-days: 30
+
+      - name: 发布到 Release（仅打 tag 时）
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: 投保数据汇总工具-windows.zip
+          name: ${{ github.ref_name }}
+          body: |
+            Windows 版打包产物。
+
+            使用方法：下载 ZIP → 解压 → 双击里面的 exe。
+
+            ⚠️ 若首次打开被 Windows SmartScreen 拦截：
+            右键 ZIP → 属性 → 勾选"解除锁定" → 再解压。
