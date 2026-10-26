@@ -24,23 +24,26 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 
-def merge_intervals(dates):
-    """将日期列表按连续性分组，返回 [(start, end), ...]"""
-    if not dates:
+def merge_segments(starts, ends, gap_days=1):
+    """把 (保障生效时间, 保障失效时间) 区间按首尾相接原则合并。
+
+    判定连续的标准：下一段生效时间 <= 当前段失效时间 + gap_days 天。
+    这样同时兼容两种数据形态：
+      - 按日投保：每行一天（如 09-01~09-01、09-02~09-02）
+      - 按区间投保：每行一个区间（如 09-01~09-04、09-05~09-11 无缝衔接）
+    """
+    if not starts:
         return []
-    dates = sorted(set(dates))
-    intervals = []
-    start = dates[0]
-    prev = dates[0]
-    for d in dates[1:]:
-        if (d - prev).days == 1:
-            prev = d
+    pairs = sorted(zip(starts, ends))
+    segments = [list(pairs[0])]
+    for start, end in pairs[1:]:
+        cur_start, cur_end = segments[-1]
+        if start <= cur_end + pd.Timedelta(days=gap_days):
+            # 与当前段连续或重叠，扩展该段的结束时间
+            segments[-1][1] = max(cur_end, end)
         else:
-            intervals.append((start, prev))
-            start = d
-            prev = d
-    intervals.append((start, prev))
-    return intervals
+            segments.append([start, end])
+    return [(s, e) for s, e in segments]
 
 
 # 多格式列名映射：统一映射为脚本内部使用的标准列名
@@ -106,21 +109,21 @@ def build_result_df(src_path, log=None):
     df = df[df['保障生效时间'].notna() & df['保障失效时间'].notna()]
     df['保障生效时间'] = pd.to_datetime(df['保障生效时间'])
     df['保障失效时间'] = pd.to_datetime(df['保障失效时间'])
-    df['生效日期'] = df['保障生效时间'].dt.date
 
     results = []
 
     for (id_num, plan), group in df.groupby(['证件号码', '方案名称']):
         name = group['姓名'].iloc[0]
-        dates = sorted(group['生效日期'].unique())
-        intervals = merge_intervals(dates)
+        segments = merge_segments(
+            group['保障生效时间'].tolist(),
+            group['保障失效时间'].tolist(),
+        )
 
-        for idx, (seg_start, seg_end) in enumerate(intervals):
-            seg_mask = (group['生效日期'] >= seg_start) & (group['生效日期'] <= seg_end)
-            seg_data = group[seg_mask]
-            eff_time = seg_data['保障生效时间'].min()
-            exp_time = seg_data['保障失效时间'].max()
-            coverage_days = (exp_time - eff_time).days + 1
+        for idx, (seg_start, seg_end) in enumerate(segments):
+            eff_time = seg_start
+            exp_time = seg_end
+            # 按日期层面计算，避免 23:59:59 / 00:12:01 这类时分秒干扰天数
+            coverage_days = (exp_time.date() - eff_time.date()).days + 1
             results.append({
                 '姓名': name,
                 '证件号码': id_num,
